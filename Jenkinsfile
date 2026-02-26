@@ -5,7 +5,8 @@ pipeline {
             steps {
                 sh '''
                 docker rmi -f backend-app || true
-                docker build -t backend-app CC_LAB-6/backend
+                # REMOVED "CC_LAB-6/" prefix here
+                docker build -t backend-app backend
                 '''
             }
         }
@@ -14,8 +15,13 @@ pipeline {
                 sh '''
                 docker network create app-network || true
                 docker rm -f backend1 backend2 || true
+                
+                # Running containers on the custom network
                 docker run -d --name backend1 --network app-network backend-app
                 docker run -d --name backend2 --network app-network backend-app
+                
+                # Wait for backends to fully initialize (prevents Nginx 502 errors)
+                sleep 5
                 '''
             }
         }
@@ -24,13 +30,20 @@ pipeline {
                 sh '''
                 docker rm -f nginx-lb || true
                 
+                # Start Nginx
                 docker run -d \
                   --name nginx-lb \
                   --network app-network \
                   -p 80:80 \
                   nginx
                 
-                docker cp CC_LAB-6/nginx/default.conf nginx-lb:/etc/nginx/conf.d/default.conf
+                # Wait for Nginx to start
+                sleep 2
+                
+                # Copy config using correct path (REMOVED "CC_LAB-6/" prefix)
+                docker cp nginx/default.conf nginx-lb:/etc/nginx/conf.d/default.conf
+                
+                # Reload Nginx to apply the config
                 docker exec nginx-lb nginx -s reload
                 '''
             }
